@@ -17,7 +17,6 @@
 #include <FL/Fl_Text_Buffer.H>  
   
 
-void set_status(const char* msg);
 void save_file(char* newfile);
 int check_save();
 void new_cb(Fl_Widget*, void*);
