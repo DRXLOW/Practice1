@@ -1,3 +1,4 @@
+#include <string>
 #include <cstring>  
 #include <cerrno>   
 #include <cstdlib>
@@ -16,13 +17,13 @@
 #include <FL/Fl_Text_Buffer.H>  
   
 
-
+void set_status(const char* msg);
 void save_file(char* newfile);
 int check_save();
 void new_cb(Fl_Widget*, void*);
 void open_cb(Fl_Widget*, void*);
-void saveas_cb(void);
-void save_cb(void);
+void save_cb(Fl_Widget*, void*);
+void saveas_cb(Fl_Widget*, void*);
 void quit_cb (Fl_Widget*, void*);
 void cut_cb(Fl_Widget*, void* v);
 void copy_cb(Fl_Widget*, void* v);
@@ -33,7 +34,7 @@ void find2_cb(Fl_Widget* w, void* v);
 void replace_cb(Fl_Widget*, void* v);
 void load_file(char *newfile, int ipos);
 
-class EditorWindow : public Fl_Double_Window { //класс окна
+class EditorWindow : public Fl_Double_Window {
     public:
         EditorWindow(int w, int h, const char* t);
         virtual ~EditorWindow() {}
@@ -44,6 +45,16 @@ class EditorWindow : public Fl_Double_Window { //класс окна
         Fl_Return_Button *replace_next;
         Fl_Button *replace_cancel;
 
+        Fl_Box* status_bar;
+
+
+        Fl_Window *find_dlg;
+        Fl_Input *find_input;
+        Fl_Button *find_next_btn;
+        Fl_Button *find_cancel_btn;
+
+
+
         Fl_Text_Editor *editor;
         char search[256];   
         void draw() override { Fl_Double_Window::draw(); }
@@ -52,14 +63,21 @@ class EditorWindow : public Fl_Double_Window { //класс окна
         
 };
 
+
 int changed = 0;
-char filename[256] = "";
+std::string filename;
+
 Fl_Text_Buffer *textbuf;
 int loading = 0;
 
+
+void changed_cb(int, int, int, int, const char*, void*) {
+    if (!loading) changed = 1;
+}
+
 void save_file(char* newfile){
     textbuf->savefile(newfile);
-    strcpy(filename, newfile);
+    textbuf->savefile(filename.c_str());
 }
 
 int check_save(){
@@ -69,7 +87,7 @@ int check_save(){
         "Да", "Нет", "Отмена");
 
     if (r == 0) { 
-    save_cb();
+    save_cb(nullptr, nullptr);
     return !changed;
     }
     return (r == 1) ? 1 : 0;
@@ -79,7 +97,7 @@ void new_cb(Fl_Widget*, void*) {
     if (changed && !check_save()) return;
 
     filename[0] = '\0'; 
-    textbuf->select(0, textbuf->length()); // очистка текстового буфера
+    textbuf->select(0, textbuf->length()); 
     textbuf->remove_selection();
     changed = 0;
     textbuf->call_modify_callbacks();
@@ -88,22 +106,23 @@ void new_cb(Fl_Widget*, void*) {
 void open_cb(Fl_Widget*, void*) {
   if (changed && !check_save()) return;
 
-  char* newfile = fl_file_chooser("Открыть", "*.txt", filename);
+  char* newfile = fl_file_chooser("Открыть", "*.txt", filename.c_str());
   if (newfile != NULL) load_file(newfile, -1);
 }
 
-void saveas_cb(void) {
-    char* newfile;
-    newfile = fl_file_chooser("Сохранить как", "*", filename);
+void save_cb(Fl_Widget*, void*) {
+    if (filename[0] == '\0') {
+        saveas_cb(nullptr, nullptr);
+    } else {
+        textbuf->savefile(filename.c_str());
+    }
+}
+
+void saveas_cb(Fl_Widget*, void*) {
+    char* newfile = fl_file_chooser("Сохранить как", "*", filename.c_str());
     if (newfile != NULL) save_file(newfile);
 }
 
-void save_cb(void) {
-    if (filename[0] == '\0') {
-        saveas_cb();
-    }
-        else save_file(filename);
-}
 
 
 
@@ -131,34 +150,35 @@ void delete_cb(Fl_Widget*, void* v) {
     textbuf->remove_selection();
 }
 
-void find_cb(Fl_Widget* w, void* v) {
+void find_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
-    const char *val;
-
-    val = fl_input("Поиск", e->search, sizeof(e->search));
-    if (val != NULL) {
-        strcpy(e->search, val);
-        find2_cb(w, v);
-    }
+    e->find_dlg->show();
 }
 
-void find2_cb(Fl_Widget* w, void* v) {
+void find2_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
-    if (e->search[0] == '\0') {
-        find_cb(w, v);
+    const char* text = e->find_input->value();
+    if (!text || strlen(text) == 0) {
+        fl_alert("Введите текст для поиска.");
         return;
     }
 
     int pos = e->editor->insert_position();
-    int found = textbuf->search_forward(pos, e->search, &pos);
+    int found = textbuf->search_forward(pos, text, &pos);
     if (found){
-        textbuf->select(pos, pos + strlen(e->search));
-        e->editor->insert_position(pos + strlen(e->search));
+        textbuf->select(pos, pos + strlen(text));
+        e->editor->insert_position(pos + strlen(text));
         e->editor->show_insert_position();
     } else {
-        fl_alert("Текст не найден.");
+        fl_alert("Текст не найден.");
     }
 }
+
+void hide_find_cb(Fl_Widget*, void* v) {
+    EditorWindow* e = (EditorWindow*)v;
+    e->find_dlg->hide();
+}
+
 
 void replace_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
@@ -170,16 +190,21 @@ void load_file(char *newfile, int ipos) {
     loading = 1;
     int insert = (ipos != -1);
     changed = insert;
-    if (!insert) strcpy(filename, "");
+    if (!insert) filename.clear();
 
     int r;
     if (!insert) r = textbuf->loadfile(newfile);
     else r = textbuf->insertfile(newfile, ipos);
     
+    
+
     if (r) {
         fl_alert("Ошибка чтения \'%s\':\n%s.", newfile, strerror(errno));
     }else
-        if (!insert) strcpy(filename, newfile);
+        if (!insert) {
+            textbuf->savefile(filename.c_str());
+            filename = newfile;
+        }
 
     loading = 0;
     textbuf->call_modify_callbacks();
@@ -195,71 +220,116 @@ void replace_all_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
     const char* find = e->replace_find->value();
     const char* replace = e->replace_with->value();
-    if (!find || strlen(find) == 0) return;
+
+    if (!find || strlen(find) == 0) {
+        fl_alert("Введите текст для поиска.");
+        return;
+    }
 
     int pos = 0;
     int found;
+    int find_len = strlen(find);
+    int replace_len = strlen(replace);
+    int count = 0;
+
     while ((found = textbuf->search_forward(pos, find, &pos))) {
-        textbuf->replace(pos, pos + strlen(find), replace);
-        pos += strlen(replace);
+        textbuf->replace(pos, pos + find_len, replace);
+        pos += replace_len;
+        count++;
+    }
+
+    if (count == 0) {
+        fl_alert("Совпадений не найдено.");
+    } else {
+        fl_message("Заменено %d совпадений.", count);
+    }
+}
+
+
+void replace_find_next_cb(Fl_Widget*, void* v) {
+    EditorWindow* e = (EditorWindow*)v;
+    const char* val = e->replace_find->value();
+    if (!val || strlen(val) == 0) {
+        fl_alert("Введите текст для поиска.");
+        return;
+    }
+
+    int pos = e->editor->insert_position();
+    int found = textbuf->search_forward(pos, val, &pos);
+    if (found) {
+        textbuf->select(pos, pos + strlen(val));
+        e->editor->insert_position(pos + strlen(val));
+        e->editor->show_insert_position();
+    } else {
+        fl_alert("Текст не найден.");
     }
 }
 
 
 
-Fl_Menu_Item menuitems[] = { //меню для команд редактора
-    {"&Файл", 0, 0, 0, FL_SUBMENU},
-        {"&Новый", FL_COMMAND + 'n', (Fl_Callback *)new_cb},
-        {"&Открыть...", FL_COMMAND + 'o', (Fl_Callback *)open_cb },
-        {"&Сохранить", FL_COMMAND + 's', (Fl_Callback *)save_cb },
-        {"Сохранить &как...", FL_COMMAND + FL_SHIFT + 's', (Fl_Callback *)saveas_cb },
-        {"&Выход", FL_COMMAND + 'q', (Fl_Callback *)quit_cb },
-        {0},
-    {"&Правка", 0, 0, 0, FL_SUBMENU},
-        {"&Вырезать", FL_COMMAND + 'x', (Fl_Callback *)cut_cb },   
-        {"&Копировать", FL_COMMAND + 'c', (Fl_Callback *)copy_cb },
-        {"&Вставить", FL_COMMAND + 'v', (Fl_Callback *)paste_cb },
-        {"&Удалить", 0, (Fl_Callback *)delete_cb },
-        {0},
-    {"&Поиск", 0, 0, 0, FL_SUBMENU},
-        {"&Найти", FL_COMMAND + 'f', (Fl_Callback *)find_cb },
-        {"&Заменить", FL_COMMAND + 'h', (Fl_Callback *)replace_cb },
-    {0}
-};
 
 
 
 EditorWindow::EditorWindow(int w, int h, const char* t) : Fl_Double_Window(w, h, t) {
     const int menu_height = 30;
     Fl_Menu_Bar *m = new Fl_Menu_Bar(0, 0, w, menu_height);
-    m->copy(menuitems);
+    m->add("&Файл/&Новый", FL_COMMAND + 'n', new_cb, this);
+    m->add("&Файл/&Открыть...", FL_COMMAND + 'o', open_cb, this);
+    m->add("&Файл/&Сохранить", FL_COMMAND + 's', save_cb, this);
+    m->add("&Файл/Сохранить &как...", FL_COMMAND + FL_SHIFT + 's', saveas_cb, this);
+    m->add("&Файл/&Выход", FL_COMMAND + 'q', quit_cb, this);
+
+    m->add("&Правка/&Вырезать", FL_COMMAND + 'x', cut_cb, this);
+    m->add("&Правка/&Копировать", FL_COMMAND + 'c', copy_cb, this);
+    m->add("&Правка/&Вставить", FL_COMMAND + 'v', paste_cb, this);
+    m->add("&Правка/&Удалить", 0, delete_cb, this);
+
+    m->add("&Поиск/&Найти", FL_COMMAND + 'f', find_cb, this);
+    m->add("&Поиск/&Заменить", FL_COMMAND + 'h', replace_cb, this);
 
     editor = new Fl_Text_Editor(0, menu_height, w, h - menu_height);
  
     this->resizable(editor);
     editor->buffer(textbuf);
 
-    replace_dlg = new Fl_Window(300, 150, "Заменить");
-    replace_find = new Fl_Input(10, 10, 180, 25, "Найти");
-    replace_with = new Fl_Input(10, 40, 180, 25, "Заменить на:");
-    replace_all = new Fl_Button(10, 80, 90, 25, "Заменить все");
-    replace_next = new Fl_Return_Button(110, 80, 90, 25, "Найти далее");
-    replace_cancel = new Fl_Button(210, 80, 80, 25, "Отмена");
+    replace_dlg = new Fl_Window(320, 130, "Заменить");
+    replace_dlg->begin();
 
+    replace_find = new Fl_Input(100, 10, 200, 25, "Найти:");
+    replace_with = new Fl_Input(100, 40, 200, 25, "Заменить на:");
+
+    replace_find->tooltip("Введите текст, который нужно найти");
+    replace_with->tooltip("Введите текст для замены");
+
+    replace_next = new Fl_Return_Button(20, 80, 90, 30, "Найти далее");
+    replace_all = new Fl_Button(120, 80, 90, 30, "Заменить все");
+    replace_cancel = new Fl_Button(220, 80, 80, 30, "Отмена");
+
+    replace_next->callback(replace_find_next_cb, this);
     replace_all->callback(replace_all_cb, this);
-    replace_next->callback(find2_cb, this);
     replace_cancel->callback(hide_replace_cb, this);
 
 
     replace_dlg->end();
     replace_dlg->set_non_modal();
 
+    find_dlg = new Fl_Window(300, 100, "Поиск");
+    find_input = new Fl_Input(90, 10, 180, 25, "Найти:");
+    find_next_btn = new Fl_Return_Button(90, 50, 90, 30, "Найти далее");
+    find_cancel_btn = new Fl_Button(190, 50, 80, 30, "Отмена");
+
+    find_input->tooltip("Введите текст для поиска");
+    find_next_btn->callback(find2_cb, this);
+    find_cancel_btn->callback(hide_find_cb, this);
+
+    find_dlg->end();
+    find_dlg->set_non_modal();
+
 
     printf("Меню создано\n");
     this->end();
     this->resizable(editor);
 }
-
 
 
 EditorWindow* new_view(){
@@ -270,6 +340,7 @@ EditorWindow* new_view(){
 
 int main(int argc, char **argv){
     textbuf = new Fl_Text_Buffer;
+    textbuf->add_modify_callback(changed_cb, nullptr);
 
     EditorWindow* window = new_view();
 
