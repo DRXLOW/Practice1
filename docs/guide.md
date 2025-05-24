@@ -1,7 +1,46 @@
-#include <string>
-#include <cstring>  
-#include <cerrno>   
+# Руководство по созданию текстового редактора на C++ с использованием FLTK
+
+## Описание проекта
+
+Простой текстовый редактор с графическим интерфейсом, реализованный на языке C++ с использованием библиотеки [FLTK (Fast Light Toolkit)](https://www.fltk.org/ "Официальный сайт FLTK"). Поддерживает функции открытия, редактирования, сохранения файлов, а также операции поиска и замены текста.
+
+## Условия
+
+Перед началом убедитесь, что у вас установлены:
+
+- Компилятор C++ (g++/clang++)
+- FLTK 1.3+ (или новее)
+- Cmake
+
+## Установка FLTK
+
+1. Скачайте [FLTK](https://www.fltk.org/software.php).
+1. Откройте MSYS2 MinGW 64-bit.
+1. Перейдите в папку с исходниками (Например, fltk-1.3.9).
+   `cd /c/fltk-1.3.9/`
+1. Создайте папку для сборки и перейдите в нее:
+   `mkdir build && cd build`
+1. Запустите CMake (укажите путь для установки C:/FLTK):
+   `cmake -G "MinGW Makefiles" -DCMAKE_INSTALL_PREFIX=C:/FLTK ..`
+1. Соберите проект:
+   `mingw32-make -j4`
+1. Установите библиотеку:
+   `mingw32-make install`
+
+## Сборка и запуск
+
+Использование g++:
+`g++ src/main.cpp -o src/editor.exe -IC:/FLTK/include -LC:/FLTK/lib -lfltk -lfltk_images -lfltk_png -lfltk_jpeg -lole32 -luuid -lcomctl32 -lgdi32 -lws2_32 -lgdiplus -lwinspool -mwindows -static `
+
+## Руководство по коду
+
+### Подключаем заголовки
+
+```#include <string>
+#include <cstring>
+#include <cerrno>
 #include <cstdlib>
+
 #include <FL/Fl.H>
 #include <FL/Fl_Double_Window.h>
 #include <FL/Fl_Input.h>
@@ -13,11 +52,21 @@
 #include <FL/Fl_Choice.h>
 #include <FL/Fl_File_Chooser.H>
 #include <FL/Fl_Browser.H>
-#include <FL/fl_ask.H>  
-#include <FL/Fl_Text_Buffer.H>  
-  
+#include <FL/fl_ask.H>
+#include <FL/Fl_Text_Buffer.H>
+```
 
-void set_status(const char* msg);
+### Глобальные переменные
+
+```int changed = 0;
+std::string filename;
+Fl_Text_Buffer *textbuf;
+int loading = 0;
+```
+
+### Объявляем основные функции
+
+```void set_status(const char* msg);
 void save_file(char* newfile);
 int check_save();
 void new_cb(Fl_Widget*, void*);
@@ -33,126 +82,159 @@ void find_cb(Fl_Widget* w, void* v);
 void find2_cb(Fl_Widget* w, void* v);
 void replace_cb(Fl_Widget*, void* v);
 void load_file(char *newfile, int ipos);
+```
 
-class EditorWindow : public Fl_Double_Window {
-    public:
-        EditorWindow(int w, int h, const char* t);
-        virtual ~EditorWindow() {}
-        Fl_Window *replace_dlg;
-        Fl_Input *replace_find;
-        Fl_Input *replace_with;
-        Fl_Button *replace_all;
-        Fl_Return_Button *replace_next;
-        Fl_Button *replace_cancel;
+### Класс окна редактора
 
-        Fl_Box* status_bar;
+```class EditorWindow : public Fl_Double_Window {
+public:
+    EditorWindow(int w, int h, const char* t);
+    virtual ~EditorWindow() {}
 
+    Fl_Window *replace_dlg;
+    Fl_Input *replace_find;
+    Fl_Input *replace_with;
+    Fl_Button *replace_all;
+    Fl_Return_Button *replace_next;
+    Fl_Button *replace_cancel;
 
-        Fl_Window *find_dlg;
-        Fl_Input *find_input;
-        Fl_Button *find_next_btn;
-        Fl_Button *find_cancel_btn;
+    Fl_Window *find_dlg;
+    Fl_Input *find_input;
+    Fl_Button *find_next_btn;
+    Fl_Button *find_cancel_btn;
 
+    Fl_Text_Editor *editor;
+    char search[256];
 
-
-        Fl_Text_Editor *editor;
-        char search[256];   
-        void draw() override { Fl_Double_Window::draw(); }
-        int handle(int event) override { return Fl_Double_Window::handle(event); }
-        void resize(int x, int y, int w, int h) override { Fl_Double_Window::resize(x, y, w, h); }
-        
+    void draw() override { Fl_Double_Window::draw(); }
+    int handle(int event) override { return Fl_Double_Window::handle(event); }
+    void resize(int x, int y, int w, int h) override { Fl_Double_Window::resize(x, y, w, h); }
 };
+```
 
+### Реализация функций
 
-int changed = 0;
-std::string filename;
+Сохранение файла:
 
-Fl_Text_Buffer *textbuf;
-int loading = 0;
-
-
-
-
-void save_file(char* newfile){
+```void save_file(char* newfile){
     textbuf->savefile(newfile);
     textbuf->savefile(filename.c_str());
 }
+```
 
+Проверка сохранения текста:
+
+```
 int check_save(){
     if (!changed) return 1;
 
-    int r = fl_choice("Файл не сохранён. Сохранить?\n", 
+    int r = fl_choice("Файл не сохранён. Сохранить?\n",
         "Да", "Нет", "Отмена");
 
-    if (r == 0) { 
+    if (r == 0) {
     save_cb(nullptr, nullptr);
     return !changed;
     }
     return (r == 1) ? 1 : 0;
 }
+```
 
+Создание нового файла:
+
+```
 void new_cb(Fl_Widget*, void*) {
     if (changed && !check_save()) return;
 
-    filename[0] = '\0'; 
-    textbuf->select(0, textbuf->length()); 
+    filename[0] = '\0';
+    textbuf->select(0, textbuf->length());
     textbuf->remove_selection();
     changed = 0;
     textbuf->call_modify_callbacks();
 }
+```
 
-void open_cb(Fl_Widget*, void*) {
+Открытие файла:
+
+```void open_cb(Fl_Widget*, void*) {
   if (changed && !check_save()) return;
 
   char* newfile = fl_file_chooser("Открыть", "*.txt", filename.c_str());
   if (newfile != NULL) load_file(newfile, -1);
 }
+```
 
-void save_cb(Fl_Widget*, void*) {
+Сохранение файла:
+
+```void save_cb(Fl_Widget*, void*) {
     if (filename[0] == '\0') {
         saveas_cb(nullptr, nullptr);
     } else {
         textbuf->savefile(filename.c_str());
     }
 }
+```
 
-void saveas_cb(Fl_Widget*, void*) {
+Сохранение файла как:
+
+```void saveas_cb(Fl_Widget*, void*) {
     char* newfile = fl_file_chooser("Сохранить как", "*", filename.c_str());
     if (newfile != NULL) save_file(newfile);
 }
+```
 
+Выйти:
 
-
-
-void quit_cb (Fl_Widget*, void*) {
+```void quit_cb (Fl_Widget*, void*) {
     if (changed && !check_save()) return;
     exit(0);
 }
+```
 
+Вырезать текст:
+
+```
 void cut_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
     e->editor->kf_cut(0, e->editor);;
 }
+```
 
+Копировать текст:
+
+```
 void copy_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
     e->editor->kf_copy(0, e->editor);;
 }
+```
 
+Вставить текст:
+
+```
 void paste_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
     e->editor->kf_paste(0, e->editor);;
 }
+```
 
+Удаление текста:
+
+```
 void delete_cb(Fl_Widget*, void* v) {
     textbuf->remove_selection();
 }
+```
 
+Поиск текста:
+
+```
 void find_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
     e->find_dlg->show();
 }
+```
 
+```
 void find2_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
     const char* text = e->find_input->value();
@@ -171,48 +253,30 @@ void find2_cb(Fl_Widget*, void* v) {
         fl_alert("Текст не найден.");
     }
 }
+```
 
+```
 void hide_find_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
     e->find_dlg->hide();
 }
+```
 
+Замена текста:
 
+`````
 void replace_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
     e->replace_dlg->show();
 }
 
 
-void load_file(char *newfile, int ipos) {
-    loading = 1;
-    int insert = (ipos != -1);
-    changed = insert;
-    if (!insert) filename.clear();
-
-    int r;
-    if (!insert) r = textbuf->loadfile(newfile);
-    else r = textbuf->insertfile(newfile, ipos);
-    
-    
-
-    if (r) {
-        fl_alert("Ошибка чтения \'%s\':\n%s.", newfile, strerror(errno));
-    }else
-        if (!insert) {
-            textbuf->savefile(filename.c_str());
-            filename = newfile;
-        }
-
-    loading = 0;
-    textbuf->call_modify_callbacks();
-    
-}
 
 void hide_replace_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
     e->replace_dlg->hide();
 }
+
 
 void replace_all_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
@@ -261,14 +325,36 @@ void replace_find_next_cb(Fl_Widget*, void* v) {
     } else {
         fl_alert("Текст не найден.");
     }
+}````
+
+Загрузка файла:
+```void load_file(char *newfile, int ipos) {
+    loading = 1;
+    int insert = (ipos != -1);
+    changed = insert;
+    if (!insert) filename.clear();
+
+    int r;
+    if (!insert) r = textbuf->loadfile(newfile);
+    else r = textbuf->insertfile(newfile, ipos);
+
+    if (r) {
+        fl_alert("Ошибка чтения \'%s\':\n%s.", newfile, strerror(errno));
+    }else
+        if (!insert) {
+            textbuf->savefile(filename.c_str());
+            filename = newfile;
+        }
+
+    loading = 0;
+    textbuf->call_modify_callbacks();
+
 }
+`````
 
+### Главное окно и меню
 
-
-
-
-
-EditorWindow::EditorWindow(int w, int h, const char* t) : Fl_Double_Window(w, h, t) {
+``````EditorWindow::EditorWindow(int w, int h, const char* t) : Fl_Double_Window(w, h, t) {
     const int menu_height = 30;
     Fl_Menu_Bar *m = new Fl_Menu_Bar(0, 0, w, menu_height);
     m->add("&Файл/&Новый", FL_COMMAND + 'n', new_cb, this);
@@ -286,7 +372,7 @@ EditorWindow::EditorWindow(int w, int h, const char* t) : Fl_Double_Window(w, h,
     m->add("&Поиск/&Заменить", FL_COMMAND + 'h', replace_cb, this);
 
     editor = new Fl_Text_Editor(0, menu_height, w, h - menu_height);
- 
+
     this->resizable(editor);
     editor->buffer(textbuf);
 
@@ -328,15 +414,21 @@ EditorWindow::EditorWindow(int w, int h, const char* t) : Fl_Double_Window(w, h,
     this->end();
     this->resizable(editor);
 }
+`````
 
+### Вывод главного окна
 
+```
 EditorWindow* new_view(){
     EditorWindow* window = new EditorWindow(800, 600, "Текстовый редактор");
     window->show();
     return window;
 }
+```
 
-int main(int argc, char **argv){
+### Сама функция main()
+
+``` int main(int argc, char **argv){
     textbuf = new Fl_Text_Buffer;
 
 
@@ -346,3 +438,8 @@ int main(int argc, char **argv){
 
     return Fl::run();
 }
+``````
+
+### Сборка и запуск
+
+`g++ src/main.cpp -o src/editor.exe -IC:/FLTK/include -LC:/FLTK/lib -lfltk -lfltk_images -lfltk_png -lfltk_jpeg -lole32 -luuid -lcomctl32 -lgdi32 -lws2_32 -lgdiplus -lwinspool -mwindows -static`
