@@ -264,19 +264,16 @@ void hide_find_cb(Fl_Widget*, void* v) {
 
 Замена текста:
 
-`````
+```
 void replace_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
     e->replace_dlg->show();
 }
 
-
-
 void hide_replace_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
     e->replace_dlg->hide();
 }
-
 
 void replace_all_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
@@ -307,7 +304,6 @@ void replace_all_cb(Fl_Widget*, void* v) {
     }
 }
 
-
 void replace_find_next_cb(Fl_Widget*, void* v) {
     EditorWindow* e = (EditorWindow*)v;
     const char* val = e->replace_find->value();
@@ -325,10 +321,13 @@ void replace_find_next_cb(Fl_Widget*, void* v) {
     } else {
         fl_alert("Текст не найден.");
     }
-}````
+}
+```
 
 Загрузка файла:
-```void load_file(char *newfile, int ipos) {
+
+```
+void load_file(char *newfile, int ipos) {
     loading = 1;
     int insert = (ipos != -1);
     changed = insert;
@@ -350,11 +349,11 @@ void replace_find_next_cb(Fl_Widget*, void* v) {
     textbuf->call_modify_callbacks();
 
 }
-`````
+```
 
 ### Главное окно и меню
 
-``````EditorWindow::EditorWindow(int w, int h, const char* t) : Fl_Double_Window(w, h, t) {
+```EditorWindow::EditorWindow(int w, int h, const char* t) : Fl_Double_Window(w, h, t) {
     const int menu_height = 30;
     Fl_Menu_Bar *m = new Fl_Menu_Bar(0, 0, w, menu_height);
     m->add("&Файл/&Новый", FL_COMMAND + 'n', new_cb, this);
@@ -414,9 +413,9 @@ void replace_find_next_cb(Fl_Widget*, void* v) {
     this->end();
     this->resizable(editor);
 }
-`````
+```
 
-### Вывод главного окна
+Вывод главного окна
 
 ```
 EditorWindow* new_view(){
@@ -426,9 +425,9 @@ EditorWindow* new_view(){
 }
 ```
 
-### Сама функция main()
+Сама функция main()
 
-``` int main(int argc, char **argv){
+```int main(int argc, char **argv){
     textbuf = new Fl_Text_Buffer;
 
 
@@ -438,8 +437,10 @@ EditorWindow* new_view(){
 
     return Fl::run();
 }
-``````
+```
 
 ### Сборка и запуск
 
-`g++ src/main.cpp -o src/editor.exe -IC:/FLTK/include -LC:/FLTK/lib -lfltk -lfltk_images -lfltk_png -lfltk_jpeg -lole32 -luuid -lcomctl32 -lgdi32 -lws2_32 -lgdiplus -lwinspool -mwindows -static`
+```
+g++ src/main.cpp -o src/editor.exe -IC:/FLTK/include -LC:/FLTK/lib -lfltk -lfltk_images -lfltk_png -lfltk_jpeg -lole32 -luuid -lcomctl32 -lgdi32 -lws2_32 -lgdiplus -lwinspool -mwindows -static
+```
